@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Particle Playground — Heatmap (custom colors)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{ --accent:255,122,26; --glass-blur:10px; --panel-bg: rgba(8,8,10,0.65); }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#07070a;font-family:Inter,system-ui,Arial;color:#ffd6a8;overflow:hidden}
+canvas{position:fixed;inset:0;display:block;z-index:0;background:transparent}
+#topbar{position:fixed;left:8px;right:8px;top:8px;z-index:120;padding:8px;border-radius:12px;background:var(--panel-bg);backdrop-filter:blur(10px);display:flex;gap:12px;align-items:center;border:1px solid rgba(255,255,255,0.03)}
+.brand{font-weight:800;color:rgb(var(--accent))}
+#toggle-btn{pointer-events:auto;background:rgba(255,255,255,0.02);border:1px solid rgba(var(--accent),0.12);color:rgb(var(--accent));padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:700}
+#toggle-btn:hover{box-shadow:0 12px 36px rgba(var(--accent),0.06);transform:translateY(-2px)}
+#control-panel{position:fixed;left:8px;right:8px;top:64px;z-index:110;transform-origin:top center;transform:translateY(-8px) scaleY(0);opacity:0;pointer-events:none;transition:transform .22s,opacity .18s}
+#control-panel.open{transform:translateY(0) scaleY(1);opacity:1;pointer-events:auto}
+.panel-inner{max-width:1200px;margin:0 auto;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));border:1px solid rgba(var(--accent),0.06);padding:12px;display:flex;gap:12px;flex-wrap:wrap;backdrop-filter: blur(calc(var(--glass-blur)+2px));box-shadow:0 18px 56px rgba(0,0,0,0.55)}
+.col{background:rgba(255,255,255,0.01);border-radius:10px;padding:10px;min-width:220px;flex:1 1 220px}
+.col.huge{flex:2 1 640px;min-width:340px}
+.tabs{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.tab{padding:6px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-weight:700;color:#ffd6a8}
+.tab.active{background:linear-gradient(180deg, rgba(var(--accent),0.12), rgba(var(--accent),0.06));color:rgb(var(--accent));border-color:rgba(var(--accent),0.18);box-shadow:0 10px 30px rgba(var(--accent),0.06)}
+.label{font-size:12px;font-weight:800;color:rgba(var(--accent),0.95);margin-bottom:4px}
+.input{margin-bottom:10px}
+input[type="number"],input[type="text"],select{background:rgba(var(--accent),0.03);border:1px solid rgba(var(--accent),0.06);color:rgb(var(--accent));padding:8px 10px;border-radius:8px;font-weight:700;text-align:center;outline:none;font-family:Inter,monospace;width:100%}
+select.dark{background:#0c0c12;color:#ffd6a8;border:1px solid rgba(255,255,255,0.06)}
+.segment{display:inline-flex;background:rgba(255,255,255,0.03);border-radius:8px;padding:4px;gap:6px}
+.segment button{background:transparent;border:1px solid rgba(255,255,255,0.04);color:#ffd6a8;padding:8px 10px;border-radius:6px;cursor:pointer;font-weight:700}
+.segment button.selected{background:linear-gradient(180deg, rgba(var(--accent),0.14), rgba(var(--accent),0.06));color:rgb(var(--accent));border-color:rgba(var(--accent),0.16);box-shadow:0 10px 30px rgba(var(--accent),0.06)}
+.pretty-toggle{display:flex;gap:8px;align-items:center;cursor:pointer;margin-bottom:8px}
+.pretty-toggle input[type=checkbox]{appearance:none;width:46px;height:28px;border-radius:14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.06);position:relative;transition:all .18s}
+.pretty-toggle input[type=checkbox]::after{content:'';position:absolute;left:4px;top:4px;width:20px;height:20px;border-radius:50%;background:#fff;transform:translateX(0);transition:transform .18s,background .18s;box-shadow:0 6px 16px rgba(0,0,0,0.6)}
+.pretty-toggle input[type=checkbox]:checked{background:linear-gradient(90deg, rgba(var(--accent),0.18), rgba(var(--accent),0.12));border-color:rgba(var(--accent),0.18)}
+.pretty-toggle input[type=checkbox]:checked::after{transform:translateX(18px);background:#fff}
+#hud{position:fixed;right:12px;bottom:12px;z-index:200;color:rgba(255,255,255,0.85);font-family:Inter,monospace;background:rgba(0,0,0,0.34);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);backdrop-filter: blur(6px);min-width:220px;text-align:left}
+#hud.low{background:linear-gradient(90deg, rgba(160,20,20,0.9), rgba(0,0,0,0.4));color:#fff;border-color:rgba(255,0,0,0.14)}
+.btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px;cursor:pointer;color:#ffd6a8;font-weight:700}
+.btn.strong{background:linear-gradient(90deg, rgba(var(--accent),0.18), rgba(var(--accent),0.06));color: rgb(var(--accent));border-color: rgba(var(--accent),0.14)}
+.small{font-size:12px;color:rgba(255,255,255,0.6)}
+.floating-panel{position:fixed;z-index:230;background:rgba(8,8,10,0.92);color:#fff;padding:8px;border-radius:8px;font-family:Inter,monospace;border:1px solid rgba(255,255,255,0.04);min-width:190px}
+@media (max-width:980px){ .panel-inner{padding:10px}.col{min-width:160px;flex-basis:45%} .col.huge{flex-basis:100%} }
+@media (max-width:620px){ .col{flex-basis:100%} .tabs{overflow:auto} }
+</style>
+</head>
+<body>
+<canvas id="vertex-canvas"></canvas>
+
+<div id="topbar">
+  <div class="brand">Particle Playground</div>
+  <button id="toggle-btn" class="btn">Settings ▾</button>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <div class="btn" id="export-config">Export</div>
+    <div class="btn" id="import-config">Import</div>
+  </div>
+</div>
+
+<div id="control-panel" aria-hidden="true">
+  <div class="panel-inner" role="region" aria-label="Particle controls">
+    <div style="flex:1 1 260px;min-width:260px" class="col">
+      <div class="tabs">
+        <button class="tab active" data-for="general">General</button>
+        <button class="tab" data-for="mouse">Mouse</button>
+        <button class="tab" data-for="physics">Physics</button>
+        <button class="tab" data-for="visuals">Visuals</button>
+        <button class="tab" data-for="blackholes">Black Holes</button>
+        <button class="tab" data-for="fields">Fields</button>
+        <button class="tab" data-for="debug">Debug</button>
+      </div>
+
+      <div id="general" class="section active" style="display:flex;flex-direction:column">
+        <div class="input"><label class="label">Particle Count</label><input id="particle-count-input" type="number" value="120"/></div>
+        <div class="input"><label class="label">Min Radius</label><input id="radius-min" type="number" value="2" step="0.25"/></div>
+        <div class="input"><label class="label">Max Radius</label><input id="radius-max" type="number" value="4" step="0.25"/></div>
+
+        <div class="input"><label class="label">UI / Overall Color</label>
+          <select id="color-select" class="dark">
+            <option value="255,122,26" selected>Orange</option>
+            <option value="200,120,255">Purple</option>
+            <option value="0,200,255">Cyan</option>
+            <option value="255,255,255">White</option>
+            <option value="0,255,120">Green</option>
+            <option value="255,0,100">Hot Pink</option>
+            <option value="custom">Custom Hex</option>
+          </select>
+          <input id="color-custom-input" type="text" placeholder="#FFA01A" style="display:none;margin-top:6px"/>
+        </div>
+
+        <div class="input"><label class="label">Dot Color</label><input id="dot-color" type="text" placeholder="#FFFFFF"/></div>
+        <div class="input"><label class="label">Line Color</label><input id="line-color" type="text" placeholder="#FFA01A"/></div>
+      </div>
+
+      <div id="fields" class="section" style="display:none;flex-direction:column">
+        <div class="input"><label class="label">Field Mode</label>
+          <select id="field-mode">
+            <option value="off">Off</option>
+            <option value="place-wind">Place - Wind</option>
+            <option value="place-vortex">Place - Vortex</option>
+            <option value="place-radial">Place - Radial</option>
+            <option value="erase">Erase Field</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label class="label">Field Radius</label><input id="field-radius" type="number" value="120"/></div>
+          <div style="flex:1"><label class="label">Field Strength</label><input id="field-strength" type="number" value="0.8" step="0.1"/></div>
+        </div>
+        <div id="field-dir-wrap" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:8px">
+            <div style="flex:1"><label class="label">Dir (0 = DOWN)</label><input id="field-dir-input" type="number" value="0" step="1"/></div>
+          </div>
+          <div class="small" style="margin-top:6px">Wind direction uses 0 = down, 90 = right, 180 = up, 270 = left.</div>
+        </div>
+        <div class="small" style="margin-top:8px">Place fields by clicking on the canvas. Vortexes spin; Radial pushes/pulls depending on strength sign; Wind pushes in one direction.</div>
+        <div style="margin-top:8px"><button id="clear-fields" class="btn">Clear Fields</button></div>
+      </div>
+
+    </div>
+
+    <div style="flex:2 1 640px;min-width:340px" class="col huge">
+      <div id="mouse" class="section" style="display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="label">Mouse Action</div>
+            <div style="margin-top:6px" class="segment" role="tablist">
+              <button id="mouse-act-attract" class="selected">Attract</button>
+              <button id="mouse-act-repel">Repel</button>
+              <button id="mouse-act-move">Move</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            <label class="pretty-toggle"><input id="mouse-hover-toggle" type="checkbox"/> <span style="margin-left:8px">Hover</span></label>
+            <label class="pretty-toggle"><input id="mouse-equal-toggle" type="checkbox" checked/> <span style="margin-left:8px">Equal effect</span></label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+          <div style="flex:1 1 120px"><label class="label">Mouse Radius</label><input id="mouse-radius-input" type="number" value="64"/></div>
+          <div style="flex:1 1 120px"><label class="label">Mouse Strength</label><input id="mouse-strength-input" type="number" value="0.35" step="0.01"/></div>
+        </div>
+        <div class="small" style="margin-top:8px">Left click = attract / Right click = repel. Move translates items by mouse delta while inside radius.</div>
+      </div>
+
+      <div id="physics" class="section" style="display:none">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1 1 160px"><label class="label">Interaction Dist</label><input id="max-repel-input" type="number" value="36"/></div>
+          <div style="flex:1 1 160px"><label class="label">Interaction Strength</label><input id="interaction-strength-input" type="number" value="0.012" step="0.001"/></div>
+          <div style="flex:1 1 160px"><label class="label">Equil Dist</label><input id="equil-dist" type="number" value="40"/></div>
+          <div style="flex:1 1 160px"><label class="label">Equil Strength</label><input id="equil-strength" type="number" value="0.01" step="0.001"/></div>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1 1 120px"><label class="label">Max Speed</label><input id="max-speed-input" type="number" value="1.0" step="0.01"/></div>
+          <div style="flex:1 1 120px"><label class="label">Momentum</label><input id="momentum-input" type="number" value="1.0" step="0.001"/></div>
+          <div style="flex:1 1 120px"><label class="label">Friction</label><input id="friction-input" type="number" value="0.995" step="0.0001"/></div>
+          <div style="flex:1 1 120px"><label class="label">Jitter</label><input id="jitter-input" type="number" value="0.01" step="0.001"/></div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:12px;align-items:center">
+          <label class="pretty-toggle"><input id="gravity-toggle" type="checkbox"/> <span style="margin-left:8px">Gravity</span></label>
+          <div style="flex:1 1 140px"><label class="label">Accel</label><input id="gravity-accel" type="number" value="0" step="0.01"/></div>
+          <div style="flex:1 1 120px"><label class="label">Max Fall</label><input id="gravity-maxfall" type="number" value="6" step="0.1"/></div>
+          <div style="flex:1 1 120px"><label class="label">Dir (0=DOWN)</label><input id="gravity-dir" type="number" value="0" step="1"/></div>
+        </div>
+      </div>
+
+      <div id="visuals" class="section" style="display:none">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1 1 160px"><label class="label">Conn Dist</label><input id="max-conn-input" type="number" value="140"/></div>
+          <div style="flex:1 1 120px"><label class="label">Line Th</label><input id="line-thickness" type="number" value="1" step="0.1"/></div>
+          <div style="flex:1 1 120px"><label class="label">Line Op</label><input id="line-opacity" type="number" value="0.55" step="0.01"/></div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap">
+          <label class="pretty-toggle"><input id="triangles-toggle" type="checkbox" checked/> <span style="margin-left:8px">Triangles</span></label>
+          <div style="flex:1 1 120px"><label class="label">Fill Color</label><input id="fill-color" type="text" value=""/></div>
+          <div class="small" style="margin-top:8px">Hex Value #RRGGBB 1-F</div>
+          <div style="flex:1 1 120px"><label class="label">Fill Alpha</label><input id="fill-alpha" type="number" value="0.12" step="0.01"/></div>
+          <div style="flex:1 1 120px"><label class="label">Min Area</label><input id="triangle-min-area" type="number" value="90"/></div>
+        </div>
+      </div>
+
+      <div id="blackholes" class="section" style="display:none">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1 1 160px"><label class="label">Mode</label>
+            <select id="bh-mode">
+              <option value="off">Off</option>
+              <option value="place">Place</option>
+              <option value="place-wormhole">Place Wormhole (2 clicks)</option>
+              <option value="erase">Erase</option>
+              <option value="move">Move</option>
+            </select>
+          </div>
+          <div style="flex:1 1 120px"><label class="label">New Size</label><input id="bh-size" type="number" value="28"/></div>
+          <div style="flex:1 1 120px"><label class="label">New Strength</label><input id="bh-strength" type="number" value="1.6" step="0.1"/></div>
+          <div style="flex:1 1 120px"><label class="label">Polarity</label>
+            <select id="bh-polarity"><option value="attract">Black (Attract)</option><option value="repel">White (Repel)</option><option value="wormhole">Wormhole Pair</option></select>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+          <label class="pretty-toggle"><input id="bh-destroy-toggle" type="checkbox"/> <span style="margin-left:8px">BH destroys (attract only)</span></label>
+          <label class="pretty-toggle"><input id="bh-opaque" type="checkbox" checked/> <span style="margin-left:8px">BH core opaque</span></label>
+        </div>
+        <div class="small" style="margin-top:8px">Black holes pull particles in. White holes push particles out. Wormholes: first click creates entrance (black), second click creates exit (white) and links them.</div>
+      </div>
+
+      <div id="debug" class="section" style="display:none">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <label class="pretty-toggle"><input id="dbg-show-arrows" type="checkbox"/> <span style="margin-left:8px">Show velocity arrows</span></label>
+          <label class="pretty-toggle"><input id="dbg-heatmap" type="checkbox"/> <span style="margin-left:8px">Heatmap (speed)</span></label>
+          <label class="pretty-toggle"><input id="dbg-trails" type="checkbox"/> <span style="margin-left:8px">Trails</span></label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <div style="flex:1 1 140px"><label class="label">Arrow scale</label><input id="dbg-arrow-scale" type="number" value="14" step="1"/></div>
+          <div style="flex:1 1 140px"><label class="label">Heatmap max strength</label><input id="dbg-heat-max" type="number" value="2.0" step="0.1"/></div>
+          <div style="flex:1 1 140px"><label class="label">Glow intensity</label><input id="dbg-glow" type="number" value="8" step="1"/></div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1 1 160px">
+            <label class="label">Cold color (hex)</label>
+            <input id="dbg-heat-cold" type="text" value="#0000FF" placeholder="#0000FF"/>
+          </div>
+          <div style="flex:1 1 160px">
+            <label class="label">Hot color (hex)</label>
+            <input id="dbg-heat-hot" type="text" value="#FF0000" placeholder="#FF0000"/>
+          </div>
+        </div>
+
+        <div class="small" style="margin-top:8px">Arrows show velocity direction and scale with speed. Heatmap blends from cold→hot based on speed. You can change the cold/hot hex values above.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="hud">FPS: <span id="fps">0</span> • Particles: <span id="hud-count">0</span> • BHs: <span id="hud-bh">0</span> • Fields: <span id="hud-fields">0</span></div>
+
+<div id="bh-editor" class="floating-panel" style="display:none">
+  <div style="font-weight:800;margin-bottom:6px">Edit BH</div>
+  <div><label style="font-size:12px">Size</label><input id="bh-edit-size" type="number" style="width:100%" /></div>
+  <div style="margin-top:6px"><label style="font-size:12px">Strength</label><input id="bh-edit-strength" type="number" style="width:100%" step="0.1" /></div>
+  <div style="margin-top:6px"><label style="font-size:12px">Polarity</label>
+    <select id="bh-edit-polarity" style="width:100%"><option value="attract">Black (Attract)</option><option value="repel">White (Repel)</option><option value="wormhole">Wormhole</option></select>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button id="bh-edit-apply" class="btn strong">Apply</button>
+    <button id="bh-edit-remove" class="btn">Remove</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('vertex-canvas'), ctx = canvas.getContext('2d');
+    
+  const heatCanvas = document.createElement('canvas'), heatCtx = heatCanvas.getContext('2d');
+
+  const DPR = () => (devicePixelRatio || 1);
+  let W = innerWidth, H = innerHeight;
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    const dpr = DPR();
+    canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    heatCanvas.width = Math.floor(W * dpr); heatCanvas.height = Math.floor(H * dpr);
+    heatCanvas.style.width = W + 'px'; heatCanvas.style.height = H + 'px';
+    heatCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    heatCtx.clearRect(0,0,W,H);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  const sel = id => document.getElementById(id);
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  const rand = (a,b) => Math.random()*(b-a)+a;
+  let uniqueId = 1;
+  const makeId = () => (uniqueId++);
+
+  const toggleBtn = sel('toggle-btn'), panel = sel('control-panel');
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const sections = { general: sel('general'), mouse: sel('mouse'), physics: sel('physics'), visuals: sel('visuals'), blackholes: sel('blackholes'), fields: sel('fields'), debug: sel('debug') };
+
+  const elCount = sel('particle-count-input'), elRmin = sel('radius-min'), elRmax = sel('radius-max');
+  const elMouseRadius = sel('mouse-radius-input'), elMouseStrength = sel('mouse-strength-input'), elMouseHover = sel('mouse-hover-toggle'), elMouseEqual = sel('mouse-equal-toggle');
+  const mouseAttract = sel('mouse-act-attract'), mouseRepel = sel('mouse-act-repel'), mouseMove = sel('mouse-act-move');
+
+  const elMaxConn = sel('max-conn-input'), elLineOp = sel('line-opacity'), elLineTh = sel('line-thickness'), elTriangles = sel('triangles-toggle');
+  const elMaxInteract = sel('max-repel-input'), elInteraction = sel('interaction-strength-input'), elEquilDist = sel('equil-dist'), elEquilStr = sel('equil-strength');
+
+  const dotColor = sel('dot-color'), lineColor = sel('line-color'), colorSelect = sel('color-select'), colorCustom = sel('color-custom-input');
+
+  const bhMode = sel('bh-mode'), bhSize = sel('bh-size'), bhStrength = sel('bh-strength'), bhPolarity = sel('bh-polarity'), bhDestroy = sel('bh-destroy-toggle'), bhOpaque = sel('bh-opaque');
+
+  const fieldMode = sel('field-mode'), fieldRadius = sel('field-radius'), fieldStrength = sel('field-strength'), clearFieldsBtn = sel('clear-fields');
+  const fieldDirWrap = sel('field-dir-wrap'), fieldDirInput = sel('field-dir-input');
+
+  const fpsEl = sel('fps'), hudCount = sel('hud-count'), hudBH = sel('hud-bh'), hudFields = sel('hud-fields');
+
+  const bhEditor = sel('bh-editor'), bhEditSize = sel('bh-edit-size'), bhEditStrength = sel('bh-edit-strength'), bhEditPol = sel('bh-edit-polarity');
+  const bhEditApply = sel('bh-edit-apply'), bhEditRemove = sel('bh-edit-remove');
+
+  const exportBtn = sel('export-config'), importBtn = sel('import-config');
+
+  const dbgShowArrows = sel('dbg-show-arrows'), dbgHeatmap = sel('dbg-heatmap'), dbgTrails = sel('dbg-trails');
+  const dbgArrowScale = sel('dbg-arrow-scale'), dbgHeatMax = sel('dbg-heat-max'), dbgGlow = sel('dbg-glow');
+  const dbgHeatCold = sel('dbg-heat-cold'), dbgHeatHot = sel('dbg-heat-hot');
+
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const f = t.getAttribute('data-for');
+    Object.keys(sections).forEach(k => sections[k].style.display = (k === f) ? (k === 'general' ? 'flex' : 'block') : 'none');
+  }));
+
+  toggleBtn.addEventListener('click', () => {
+    const open = !panel.classList.contains('open');
+    panel.classList.toggle('open', open);
+    toggleBtn.textContent = open ? 'Settings ▴' : 'Settings ▾';
+  });
+  document.addEventListener('mousedown', (e) => {
+    const inside = panel.contains(e.target) || toggleBtn.contains(e.target);
+    if (!inside && panel.classList.contains('open')) { panel.classList.remove('open'); toggleBtn.textContent = 'Settings ▾'; }
+  });
+
+  let STATE = {
+    COUNT: Number(elCount.value) || 120,
+    RMIN: Number(elRmin.value) || 2,
+    RMAX: Number(elRmax.value) || 4,
+    COLOR: [255,122,26],
+    DOT_HEX: '#FFFFFF',
+    LINE_HEX: '#FF7A1A'
+  };
+
+  const particles = [];
+  const blackholes = [];
+  const wormPairs = [];
+  const fields = [];
+
+  function initParticles(n) {
+    particles.length = 0;
+    for (let i = 0; i < n; i++) particles.push({
+      id: makeId(),
+      x: rand(0,W), y: rand(0,H),
+      vx: (Math.random()-0.5)*0.6, vy: (Math.random()-0.5)*0.6,
+      r: rand(STATE.RMIN,STATE.RMAX),
+      repelled: false
+    });
+    hudCount.textContent = particles.length;
+  }
+  initParticles(STATE.COUNT);
+
+  colorSelect.addEventListener('change', () => {
+    if (colorSelect.value === 'custom') { colorCustom.style.display = 'block'; colorCustom.focus(); return; }
+    colorCustom.style.display = 'none';
+    STATE.COLOR = colorSelect.value.split(',').map(n=>Number(n));
+    document.documentElement.style.setProperty('--accent', STATE.COLOR.join(','));
+  });
+  colorCustom.addEventListener('input', () => {
+    const v = colorCustom.value.trim(), hex = v.startsWith('#') ? v.slice(1) : v;
+    if (/^[0-9A-Fa-f]{6}$/.test(hex)) {
+      STATE.COLOR = [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
+      document.documentElement.style.setProperty('--accent', STATE.COLOR.join(','));
+    }
+  });
+
+  const mouse = {x:W/2,y:H/2,prevX:W/2,prevY:H/2,down:0,over:false, dragBH:null};
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    mouse.prevX = mouse.x; mouse.prevY = mouse.y;
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.over = true;
+    if (mouse.dragBH && bhMode.value === 'move') { mouse.dragBH.x = mouse.x; mouse.dragBH.y = mouse.y; }
+  });
+  canvas.addEventListener('mouseleave', ()=> mouse.over = false);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  function addBH(x,y,size,str,pol,opts={}) {
+    const r = Math.max(2, Number(size) || 28);
+    const mass = Math.PI * r * r;
+    const id = makeId();
+    const bh = { id, x, y, r, strength: Number(str) || 1.6, polarity: pol, mass, vx: opts.vx||0, vy: opts.vy||0, destroy: !!opts.destroy, opaque: !!opts.opaque, beingDragged:false, _emit: opts._emit || [] };
+    blackholes.push(bh);
+    updateHUD();
+    return bh;
+  }
+  function removeBHById(id){
+    for(let i=blackholes.length-1;i>=0;i--) if(blackholes[i].id === id) blackholes.splice(i,1);
+    for(let i=wormPairs.length-1;i>=0;i--) { if(wormPairs[i].in === id || wormPairs[i].out === id) wormPairs.splice(i,1); }
+    updateHUD();
+  }
+
+  function addField(type,x,y,radius,str,dir=0){
+    const id = makeId();
+    fields.push({ id, type, x, y, radius: Number(radius)||120, strength: Number(str)||0.8, dir: Number(dir)||0 });
+    updateHUD();
+    return id;
+  }
+  function eraseFieldAt(x,y) {
+    for (let i = fields.length-1; i >= 0; i--) if (Math.hypot(fields[i].x-x, fields[i].y-y) <= (fields[i].radius || 0)) fields.splice(i,1);
+    updateHUD();
+  }
+  function clearFields(){ fields.length = 0; updateHUD(); }
+
+  let pendingWormEntrance = null;
+  canvas.addEventListener('mousedown', e => {
+    mouse.down = e.button + 1;
+    const r = canvas.getBoundingClientRect();
+    const cx = e.clientX - r.left, cy = e.clientY - r.top;
+
+    const fmode = fieldMode.value;
+    if (fmode && fmode !== 'off' && fmode !== 'erase') {
+      const t = fmode.split('-')[1] || 'wind';
+      const dir = (t === 'wind') ? (Number(fieldDirInput.value) || 0) : 0;
+      addField(t, cx, cy, Number(fieldRadius.value)||120, Number(fieldStrength.value)||0.8, dir);
+      return;
+    } else if (fmode === 'erase') {
+      eraseFieldAt(cx, cy);
+      return;
+    }
+
+    const bmode = bhMode.value;
+    if (bmode === 'place') {
+      const pol = bhPolarity.value;
+      addBH(cx, cy, bhSize.value, bhStrength.value, (pol === 'wormhole') ? 'attract' : pol, { destroy: bhDestroy.checked, opaque: bhOpaque.checked });
+      return;
+    } else if (bmode === 'erase') {
+      for (let i = blackholes.length-1; i >= 0; i--) if (Math.hypot(blackholes[i].x - cx, blackholes[i].y - cy) <= blackholes[i].r) removeBHById(blackholes[i].id);
+      return;
+    } else if (bmode === 'move') {
+      for (const b of blackholes) {
+        if (Math.hypot(b.x-cx, b.y-cy) <= b.r) { mouse.dragBH = b; b.beingDragged = true; return; }
+      }
+    } else if (bmode === 'place-wormhole') {
+      if (!pendingWormEntrance) {
+        const entr = addBH(cx, cy, bhSize.value, bhStrength.value, 'attract', { destroy: bhDestroy.checked, opaque: true });
+        pendingWormEntrance = entr.id;
+        return;
+      } else {
+        const exit = addBH(cx, cy, bhSize.value, bhStrength.value, 'repel', { destroy: false, opaque: true });
+        wormPairs.push({ in: pendingWormEntrance, out: exit.id });
+        pendingWormEntrance = null;
+        return;
+      }
+    } else {
+      const clickedBH = blackholes.find(b => Math.hypot(b.x - cx, b.y - cy) <= b.r);
+      if (clickedBH) {
+        openBHEdit(clickedBH, cx, cy);
+        return;
+      }
+    }
+  });
+
+  window.addEventListener('mouseup', ()=> {
+    if (mouse.dragBH) { mouse.dragBH.beingDragged = false; mouse.dragBH = null; }
+    mouse.down = 0;
+  });
+
+  function openBHEdit(bh, clickX, clickY) {
+    bhEditor.style.display = 'block';
+    const pad = 8;
+    const left = Math.min(window.innerWidth - 220, Math.max(10, bh.x + pad));
+    const top = Math.min(window.innerHeight - 140, Math.max(10, bh.y + pad));
+    bhEditor.style.left = left + 'px'; bhEditor.style.top = top + 'px';
+    bhEditSize.value = bh.r;
+    bhEditStrength.value = bh.strength;
+    bhEditPol.value = bh.polarity;
+    bhEditor.currentBH = bh;
+  }
+  bhEditApply.addEventListener('click', () => {
+    const bh = bhEditor.currentBH;
+    if (!bh) return;
+    bh.r = Math.max(2, Number(bhEditSize.value) || bh.r);
+    bh.strength = Number(bhEditStrength.value) || bh.strength;
+    bh.polarity = bhEditPol.value;
+    bhEditor.style.display = 'none';
+  });
+  bhEditRemove.addEventListener('click', () => {
+    const bh = bhEditor.currentBH;
+    if (!bh) return;
+    removeBHById(bh.id);
+    bhEditor.style.display = 'none';
+  });
+
+  clearFieldsBtn.addEventListener('click', clearFields);
+
+  fieldMode.addEventListener('change', ()=> {
+    fieldDirWrap.style.display = fieldMode.value.includes('wind') ? 'block' : 'none';
+  });
+
+  let MOUSE_ACTION = 'attract';
+  function selectMouseAction(name) {
+    MOUSE_ACTION = name;
+    [mouseAttract, mouseRepel, mouseMove].forEach(b => b.classList.toggle('selected', b.id === 'mouse-act-'+name));
+  }
+  mouseAttract.addEventListener('click', ()=> selectMouseAction('attract'));
+  mouseRepel.addEventListener('click', ()=> selectMouseAction('repel'));
+  mouseMove.addEventListener('click', ()=> selectMouseAction('move'));
+
+  function applyBlackHoles() {
+    for (let bh of blackholes) {
+      if (!bh.beingDragged) {
+        bh.x += bh.vx || 0; bh.y += bh.vy || 0;
+        bh.vx = (bh.vx || 0) * 0.995; bh.vy = (bh.vy || 0) * 0.995;
+        if (bh.x < 0) { bh.x = 0; bh.vx *= -0.6 }
+        if (bh.y < 0) { bh.y = 0; bh.vy *= -0.6 }
+        if (bh.x > W) { bh.x = W; bh.vx *= -0.6 }
+        if (bh.y > H) { bh.y = H; bh.vy *= -0.6 }
+      }
+    }
+
+    const softBH = 0.00018;
+    for (let i = 0; i < blackholes.length; i++) {
+      const A = blackholes[i];
+      for (let j = i+1; j < blackholes.length; j++) {
+        const B = blackholes[j];
+        const dx = B.x - A.x, dy = B.y - A.y; const d2 = dx*dx + dy*dy;
+        const d = Math.sqrt(d2) || 0.0001;
+        if (d < 2000) {
+          const polarityFactor = (A.polarity === 'repel' || B.polarity === 'repel') ? -1 : 1;
+          const nx = dx/d, ny = dy/d;
+          const force = ((A.strength||1) * (B.strength||1)) / (d2 * softBH + 0.01);
+          const msum = (A.mass || Math.PI*A.r*A.r) + (B.mass || Math.PI*B.r*B.r);
+          const fa = force * ((B.mass || Math.PI*B.r*B.r) / msum) * polarityFactor;
+          const fb = force * ((A.mass || Math.PI*A.r*A.r) / msum) * polarityFactor;
+          A.vx += nx * fa;
+          A.vy += ny * fa;
+          B.vx -= nx * fb;
+          B.vy -= ny * fb;
+        }
+      }
+    }
+
+    const sampleAll = particles.length <= 1600;
+    const step = sampleAll ? 1 : Math.max(1, Math.floor(particles.length / 1600));
+    for (let i = 0; i < particles.length; i += step) {
+      const p = particles[i];
+      for (let bh of blackholes) {
+        const dx = p.x - bh.x, dy = p.y - bh.y; const d2 = dx*dx + dy*dy; const d = Math.sqrt(d2) || 0.0001;
+        const influence = bh.r*8 + 200;
+        if (d < influence) {
+          const nx = dx/d, ny = dy/d;
+          const soft = 0.00025;
+          const mag = bh.strength * (1 / (d2 * soft + 0.01));
+          if (bh.polarity === 'repel') {
+            p.vx += nx * mag;
+            p.vy += ny * mag;
+            p.repelled = true;
+            bh._emit = bh._emit || [];
+            if (Math.random() < 0.06) {
+              bh._emit.push({ x: p.x, y: p.y, vx: nx * 0.6 + (Math.random()-0.5)*0.2, vy: ny*0.6 + (Math.random()-0.5)*0.2, life: 30 });
+            }
+          } else if (bh.polarity === 'attract') {
+            p.vx += -nx * mag;
+            p.vy += -ny * mag;
+            bh._emit = bh._emit || [];
+            if (Math.random() < 0.06) {
+              bh._emit.push({ x: p.x, y: p.y, vx: -nx * 0.2 + (Math.random()-0.5)*0.1, vy: -ny*0.2 + (Math.random()-0.5)*0.1, life: 30 });
+            }
+            if (bh.destroy && d < bh.r * 0.45) {
+              const pmass = Math.PI * p.r * p.r;
+              bh.mass = (bh.mass || Math.PI*bh.r*bh.r) + pmass;
+              bh.r = Math.sqrt(bh.mass / Math.PI);
+              particles.splice(i,1);
+              i = Math.max(0, i-step);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    for (const pair of wormPairs.slice()) {
+      const inBH = blackholes.find(b => b.id === pair.in);
+      const outBH = blackholes.find(b => b.id === pair.out);
+      if (!inBH || !outBH) continue;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        const d = Math.hypot(p.x - inBH.x, p.y - inBH.y);
+        if (d <= inBH.r * 0.9) {
+          const angle = Math.random() * Math.PI * 2;
+          const spread = outBH.r + 6;
+          p.x = outBH.x + Math.cos(angle) * spread;
+          p.y = outBH.y + Math.sin(angle) * spread;
+          const nx = (p.x - outBH.x) || 0.001, ny = (p.y - outBH.y) || 0.001;
+          const nd = Math.hypot(nx, ny) || 0.0001;
+          p.vx = (nx/nd) * (outBH.strength * 0.8 + Math.random()*0.6);
+          p.vy = (ny/nd) * (outBH.strength * 0.8 + Math.random()*0.6);
+          outBH._emit = outBH._emit || [];
+          if (Math.random() < 0.8) outBH._emit.push({ x: p.x, y: p.y, vx: p.vx*0.2, vy: p.vy*0.2, life: 24 });
+        }
+      }
+    }
+
+    for (let i = 0; i < blackholes.length; i++) {
+      for (let j = i+1; j < blackholes.length; j++) {
+        const A = blackholes[i], B = blackholes[j];
+        const d = Math.hypot(A.x-B.x, A.y-B.y);
+        if (d <= (A.r + B.r + 2)) {
+          const area = Math.PI*A.r*A.r + Math.PI*B.r*B.r;
+          const newR = Math.sqrt(area / Math.PI);
+          const newMass = (A.mass || Math.PI*A.r*A.r) + (B.mass || Math.PI*B.r*B.r);
+          const newStrength = (A.strength*(A.mass||A.r) + B.strength*(B.mass||B.r)) / Math.max(1,newMass);
+          const newPol = (A.polarity === B.polarity) ? A.polarity : (Math.random()<0.5?A.polarity:B.polarity);
+          const nx = (A.x*(A.mass||A.r) + B.x*(B.mass||B.r)) / newMass, ny = (A.y*(A.mass||A.r) + B.y*(B.mass||B.r)) / newMass;
+          const nvx = ((A.vx||0)*(A.mass||A.r) + (B.vx||0)*(B.mass||B.r)) / newMass || 0;
+          const nvy = ((A.vy||0)*(A.mass||A.r) + (B.vy||0)*(B.mass||B.r)) / newMass || 0;
+          blackholes.splice(j,1); blackholes.splice(i,1);
+          blackholes.push({ id: makeId(), x: nx, y: ny, r: newR, strength: newStrength, mass: newMass, polarity: newPol, vx: nvx, vy: nvy, destroy: A.destroy||B.destroy, opaque: A.opaque||B.opaque, beingDragged:false, _emit: [] });
+          wormPairs.forEach(w => { if (w.in===A.id) w.in = null; if (w.out===A.id) w.out = null; if (w.in===B.id) w.in = null; if (w.out===B.id) w.out = null; });
+          i = -1; break;
+        }
+      }
+    }
+
+    updateHUD();
+  }
+
+  function applyFields(p) {
+    for (let f of fields) {
+      const dx = p.x - f.x, dy = p.y - f.y; const d2 = dx*dx + dy*dy;
+      if (d2 > (f.radius*f.radius)) continue;
+      const d = Math.sqrt(d2) || 0.0001;
+      if (f.type === 'wind') {
+        const rad = (f.dir || 0) * Math.PI/180;
+        p.vx += Math.sin(rad) * f.strength * 0.02;
+        p.vy += Math.cos(rad) * f.strength * 0.02;
+      } else if (f.type === 'radial') {
+        const mag = f.strength * (1 - d / f.radius);
+        p.vx += (dx/d) * mag * 0.02;
+        p.vy += (dy/d) * mag * 0.02;
+      } else if (f.type === 'vortex') {
+        const mag = f.strength * (1 - d / f.radius);
+        p.vx += (-dy / d) * mag * 0.02;
+        p.vy += (dx / d) * mag * 0.02;
+      }
+    }
+  }
+
+  function applyMouseEffect() {
+    const apply = elMouseHover.checked ? mouse.over : (mouse.down === 1 || mouse.down === 2);
+    if (!apply) { mouse.prevX = mouse.x; mouse.prevY = mouse.y; return; }
+    const dxMouse = mouse.x - mouse.prevX, dyMouse = mouse.y - mouse.prevY;
+    const radius = Number(elMouseRadius.value) || 64;
+    const strengthBase = Number(elMouseStrength.value) || 0.35;
+    const equal = elMouseEqual.checked;
+
+    for (const p of particles) {
+      const dx = p.x - mouse.x, dy = p.y - mouse.y; const d2 = dx*dx + dy*dy;
+      if (d2 <= radius*radius) {
+        const d = Math.sqrt(d2) || 0.0001; const nx = dx/d, ny = dy/d;
+        if (MOUSE_ACTION === 'move') {
+          p.x += dxMouse; p.y += dyMouse;
+        } else {
+          let mag = strengthBase;
+          if (!elMouseHover.checked) {
+            if (mouse.down === 1) mag = Math.abs(strengthBase);
+            else if (mouse.down === 2) mag = -Math.abs(strengthBase);
+          } else {
+            mag = (MOUSE_ACTION === 'attract') ? Math.abs(strengthBase) : -Math.abs(strengthBase);
+          }
+          if (equal) {
+            p.vx += -nx * mag;
+            p.vy += -ny * mag;
+          } else {
+            const factor = 1 - d / radius;
+            p.vx += -nx * mag * factor;
+            p.vy += -ny * mag * factor;
+          }
+        }
+      }
+    }
+
+    for (const b of blackholes) {
+      const dx = b.x - mouse.x, dy = b.y - mouse.y; const d2 = dx*dx + dy*dy;
+      if (d2 <= radius*radius) {
+        const d = Math.sqrt(d2) || 0.0001; const nx = dx/d, ny = dy/d;
+        let mag = (strengthBase * 0.6);
+        if (!elMouseHover.checked) {
+          if (mouse.down === 1) { b.vx += -nx * mag; b.vy += -ny * mag; }
+          else if (mouse.down === 2) { b.vx += nx * mag; b.vy += ny * mag; }
+        } else {
+          if (MOUSE_ACTION === 'attract') { b.vx += -nx * mag; b.vy += -ny * mag; }
+          else if (MOUSE_ACTION === 'repel') { b.vx += nx * mag; b.vy += ny * mag; }
+        }
+      }
+    }
+
+    mouse.prevX = mouse.x; mouse.prevY = mouse.y;
+  }
+
+  function particleInteractions() {
+    const N = particles.length;
+    const maxInteract = Number(elMaxInteract.value) || 36;
+    const base = Number(elInteraction.value) || 0.012;
+    const eqDist = Number(elEquilDist.value) || 40;
+    const eqStr = Number(elEquilStr.value) || 0.01;
+    const limit = Math.min(N, 600);
+    for (let i = 0; i < N; i++) {
+      const a = particles[i];
+      a.repelled = false;
+      for (let j = i+1; j < N && j < i+limit; j++) {
+        const b = particles[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        const d2 = dx*dx + dy*dy; if (d2 === 0) continue;
+        const d = Math.sqrt(d2);
+        if (d <= maxInteract) {
+          const nx = dx/d, ny = dy/d;
+          a.vx += nx * base * 0.002; a.vy += ny * base * 0.002;
+          b.vx -= nx * base * 0.002; b.vy -= ny * base * 0.002;
+          if (base > 0) { a.repelled = true; b.repelled = true; }
+        }
+        if (eqStr !== 0 && d < Math.max(maxInteract, eqDist*2)) {
+          const nx = dx/d, ny = dy/d; const diff = d - eqDist; const eq = -eqStr * diff * 0.001;
+          a.vx += nx * eq; a.vy += ny * eq; b.vx -= nx * eq; b.vy -= ny * eq;
+        }
+      }
+    }
+  }
+
+  function applyGravity() {
+    if (!sel('gravity-toggle').checked) return;
+    const acc = Number(sel('gravity-accel').value) || 0;
+    if (acc === 0) return;
+    const rad = (Number(sel('gravity-dir').value) || 0) * Math.PI/180;
+    const ax = Math.sin(rad) * acc, ay = Math.cos(rad) * acc;
+    for (const p of particles) {
+      p.vx += ax; p.vy += ay;
+      const gx = Math.sin(rad), gy = Math.cos(rad);
+      const proj = p.vx*gx + p.vy*gy;
+      const maxf = Number(sel('gravity-maxfall').value) || 6;
+      if (proj > maxf) { const excess = proj - maxf; p.vx -= gx * excess; p.vy -= gy * excess; }
+      else if (proj < -maxf) { const excess = proj + maxf; p.vx -= gx * excess; p.vy -= gy * excess; }
+    }
+  }
+
+  function hexToRgb(hex) {
+    if (!hex) return [0,0,0];
+    const v = hex.trim().startsWith('#') ? hex.trim().slice(1) : hex.trim();
+    if (!/^[0-9A-Fa-f]{6}$/.test(v)) return [0,0,0];
+    return [parseInt(v.slice(0,2),16), parseInt(v.slice(2,4),16), parseInt(v.slice(4,6),16)];
+  }
+  function lerp(a,b,t){ return a + (b-a)*t; }
+
+  function heatColorMap(t) {
+    t = clamp(t, 0, 1);
+    const cold = hexToRgb((dbgHeatCold.value||'#0000FF').trim());
+    const hot  = hexToRgb((dbgHeatHot.value||'#FF0000').trim());
+    const r = Math.round(lerp(cold[0], hot[0], t));
+    const g = Math.round(lerp(cold[1], hot[1], t));
+    const b = Math.round(lerp(cold[2], hot[2], t));
+    return [r,g,b];
+  }
+
+  function stampHeat(px, py, intensity, radius) {
+    const grd = heatCtx.createRadialGradient(px, py, 0, px, py, radius);
+    const inner = Math.min(0.95, intensity * 0.95 + 0.02);
+    grd.addColorStop(0, `rgba(255,255,255,${inner})`);
+    grd.addColorStop(0.6, `rgba(255,255,255,${inner*0.28})`);
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    heatCtx.globalCompositeOperation = 'lighter';
+    heatCtx.fillStyle = grd;
+    heatCtx.beginPath();
+    heatCtx.arc(px, py, radius, 0, Math.PI*2);
+    heatCtx.fill();
+    heatCtx.globalCompositeOperation = 'source-over';
+  }
+
+  function fadeHeat(decayAlpha) {
+    heatCtx.globalCompositeOperation = 'source-over';
+    heatCtx.fillStyle = `rgba(0,0,0,${decayAlpha})`;
+    heatCtx.fillRect(0,0,W,H);
+  }
+
+  let last = performance.now(), frames = 0, lastFPS = performance.now();
+  function frame(now) {
+    const dt = Math.min(60, now - last); last = now;
+
+    particleInteractions();
+    applyFieldsToAll();
+    applyMouseEffect();
+    applyBlackHoles();
+    applyGravity();
+
+    const trails = dbgTrails.checked;
+    const heatOn = dbgHeatmap.checked;
+    const heatMax = Number(dbgHeatMax.value) || 2.0;
+    const arrowScale = Number(dbgArrowScale.value) || 14;
+    const glowInt = Number(dbgGlow.value) || 8;
+
+    if (trails) {
+      const fade = clamp(0.04 + (glowInt) * 0.002, 0.01, 0.22);
+      ctx.fillStyle = `rgba(0,0,0,${fade})`;
+      ctx.fillRect(0,0,W,H);
+    } else {
+      ctx.clearRect(0,0,W,H);
+    }
+
+    if (heatOn) {
+      const heatDecay = 0.02;
+      fadeHeat(heatDecay);
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        const speed = Math.hypot(p.vx, p.vy);
+        const intensity = clamp(speed / (heatMax || 1), 0, 1);
+        const stampRadius = Math.max(6, p.r * (1 + intensity*3));
+        stampHeat(p.x, p.y, intensity, stampRadius);
+      }
+
+      try {
+        const wpx = heatCanvas.width, hpx = heatCanvas.height;
+        const src = heatCtx.getImageData(0,0,wpx,hpx);
+        const dst = ctx.createImageData(wpx, hpx);
+        const sdata = src.data, ddata = dst.data;
+
+        const coldRGB = hexToRgb((dbgHeatCold.value||'#0000FF').trim());
+        const hotRGB  = hexToRgb((dbgHeatHot.value||'#FF0000').trim());
+
+        for (let i=0, len = sdata.length/4; i < len; i++) {
+          const si = i*4;
+          const v = sdata[si];
+          if (v === 0) {
+            ddata[si] = 0; ddata[si+1]=0; ddata[si+2]=0; ddata[si+3]=0;
+            continue;
+          }
+          const t = v / 255;
+          const r = Math.round(lerp(coldRGB[0], hotRGB[0], t));
+          const g = Math.round(lerp(coldRGB[1], hotRGB[1], t));
+          const b = Math.round(lerp(coldRGB[2], hotRGB[2], t));
+          const a = Math.round(255 * clamp(t*1.2, 0, 1));
+          ddata[si] = r; ddata[si+1] = g; ddata[si+2] = b; ddata[si+3] = a;
+        }
+
+        const temp = document.createElement('canvas');
+        temp.width = wpx; temp.height = hpx;
+        const tctx = temp.getContext('2d');
+        tctx.putImageData(dst, 0, 0);
+
+        ctx.save();
+        ctx.globalAlpha = 0.96;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(temp, 0, 0, W, H);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      } catch (err) {
+
+      }
+    }
+
+    const maxConn = Number(elMaxConn.value) || 140;
+    const maxDraw = Math.min(particles.length, 700);
+    for (let i = 0; i < maxDraw; i++) {
+      for (let j = i+1; j < Math.min(particles.length, i+150); j++) {
+        const a = particles[i], b = particles[j];
+        const d = Math.hypot(a.x-b.x, a.y-b.y);
+        if (d < maxConn) {
+          const fade = (1 - d/maxConn);
+          let r,g,bb;
+          const lc = (lineColor.value||'').trim();
+          if (/^#([0-9A-Fa-f]{6})$/.test(lc)){ r = parseInt(lc.slice(1,3),16); g = parseInt(lc.slice(3,5),16); bb = parseInt(lc.slice(5,7),16); }
+          else { [r,g,bb] = STATE.COLOR; }
+          ctx.strokeStyle = `rgba(${r},${g},${bb},${(Number(elLineOp.value)||0.55) * fade})`;
+          ctx.lineWidth = Math.max(0.1, Number(elLineTh.value)||1);
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+    }
+
+    if (sel('triangles-toggle').checked && particles.length <= 420) {
+      const N = particles.length;
+      const fcRaw = (sel('fill-color').value || '').trim();
+      const fc = /^#([0-9A-Fa-f]{6})$/.test(fcRaw) ? fcRaw : ('#' + STATE.COLOR.map(c => c.toString(16).padStart(2,'0')).join(''));
+      if (/^#([0-9A-Fa-f]{6})$/.test(fc)) {
+        const rC=parseInt(fc.slice(1,3),16), gC=parseInt(fc.slice(3,5),16), bC=parseInt(fc.slice(5,7),16);
+        for (let i=0;i<N;i++){
+          for (let j=i+1;j<N;j++){
+            for (let k=j+1;k<N;k++){
+              const a=particles[i], b=particles[j], c=particles[k];
+              const d1=Math.hypot(a.x-b.x,a.y-b.y), d2=Math.hypot(a.x-c.x,a.y-c.y), d3=Math.hypot(b.x-c.x,b.y-c.y);
+              if (d1<maxConn && d2<maxConn && d3<maxConn){
+                const area = Math.abs((b.x-a.x)*(c.y-a.y) - (c.x-a.x)*(b.y-a.y))*0.5;
+                if (area < Number(sel('triangle-min-area').value || 90)) continue;
+                const avg = (d1+d2+d3)/3; const fade = Math.max(0,1-avg/maxConn);
+                const alpha = (Number(sel('fill-alpha').value)||0.12) * fade;
+                if (alpha<=0) continue;
+                ctx.beginPath(); ctx.fillStyle = `rgba(${rC},${gC},${bC},${alpha.toFixed(3)})`; ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.closePath(); ctx.fill();
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const baseDotRaw = (dotColor.value||'').trim();
+    let baseDotRGB = STATE.COLOR.slice();
+    if (/^#([0-9A-Fa-f]{6})$/.test(baseDotRaw)) {
+      baseDotRGB = [parseInt(baseDotRaw.slice(1,3),16), parseInt(baseDotRaw.slice(3,5),16), parseInt(baseDotRaw.slice(5,7),16)];
+    }
+    const showArrows = dbgShowArrows.checked;
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.vx += (Math.random()-0.5) * (Number(sel('jitter-input').value) || 0.01);
+      p.vy += (Math.random()-0.5) * (Number(sel('jitter-input').value) || 0.01);
+      p.vx *= Number(sel('momentum-input').value) || 1;
+      p.vy *= Number(sel('momentum-input').value) || 1;
+      p.vx *= Number(sel('friction-input').value) || 1;
+      p.vy *= Number(sel('friction-input').value) || 1;
+      p.vx = clamp(p.vx, -Number(sel('max-speed-input').value)||-1, Number(sel('max-speed-input').value)||1);
+      p.vy = clamp(p.vy, -Number(sel('max-speed-input').value)||-1, Number(sel('max-speed-input').value)||1);
+      p.x += p.vx * (dt/16); p.y += p.vy * (dt/16);
+      if (p.x < 0) { p.x = 0; p.vx *= -0.6 } if (p.y < 0) { p.y = 0; p.vy *= -0.6 }
+      if (p.x > W) { p.x = W; p.vx *= -0.6 } if (p.y > H) { p.y = H; p.vy *= -0.6 }
+
+      const speed = Math.hypot(p.vx, p.vy);
+
+      let rC = baseDotRGB[0], gC = baseDotRGB[1], bC = baseDotRGB[2];
+
+      const baseAlpha = 0.16;
+      let drawAlpha = baseAlpha;
+      if (p.repelled) drawAlpha = Math.min(1, baseAlpha + 0.18);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.shadowBlur = Math.min(60, Math.max(0, glowInt));
+      ctx.shadowColor = `rgba(${rC},${gC},${bC},${drawAlpha})`;
+      ctx.fillStyle = `rgba(${rC},${gC},${bC},${drawAlpha})`;
+      ctx.arc(p.x, p.y, p.repelled ? Math.max(1, p.r * 1.15) : p.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      if (showArrows) {
+        const ang = Math.atan2(p.vy, p.vx);
+        const len = 2 + speed * arrowScale;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(ang);
+        ctx.lineWidth = Math.max(0.6, Math.min(2, drawAlpha * 3));
+        ctx.strokeStyle = `rgba(${rC},${gC},${bC},${Math.min(1, drawAlpha+0.2)})`;
+        ctx.beginPath();
+        ctx.moveTo(-len*0.15, 0);
+        ctx.lineTo(len, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(len, 0);
+        ctx.lineTo(len - 4, 2.5);
+        ctx.lineTo(len - 4, -2.5);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${rC},${gC},${bC},${Math.min(1, drawAlpha+0.3)})`;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      p.repelled = false;
+    }
+
+    for (const f of fields) {
+      ctx.beginPath();
+      if (f.type === 'wind') ctx.strokeStyle = `rgba(${STATE.COLOR.join(',')},0.12)`;
+      else if (f.type === 'vortex') ctx.strokeStyle = `rgba(200,120,255,0.12)`;
+      else ctx.strokeStyle = `rgba(255,255,255,0.06)`;
+      ctx.lineWidth = 1;
+      ctx.arc(f.x, f.y, f.radius, 0, Math.PI*2); ctx.stroke();
+    }
+
+    for (const bh of blackholes) {
+      if (bh._emit && bh._emit.length) {
+        for (let i = bh._emit.length-1; i >= 0; i--) {
+          const e = bh._emit[i];
+          e.x += e.vx; e.y += e.vy; e.life--;
+          const col = (bh.polarity === 'repel') ? '255,255,255' : '0,0,0';
+          ctx.beginPath(); ctx.fillStyle = `rgba(${col},${Math.max(0, e.life/30).toFixed(3)})`; ctx.arc(e.x, e.y, 1.2, 0, Math.PI*2); ctx.fill();
+          if (e.life <= 0) bh._emit.splice(i,1);
+        }
+      }
+      const grd = ctx.createRadialGradient(bh.x,bh.y,0,bh.x,bh.y,bh.r*4);
+      grd.addColorStop(0, `rgba(${STATE.COLOR.join(',')},0.28)`); grd.addColorStop(0.7, `rgba(${STATE.COLOR.join(',')},0.06)`); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.fillStyle = grd; ctx.arc(bh.x,bh.y,bh.r*4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      if (bh.polarity === 'repel') ctx.fillStyle = '#ffffff'; else ctx.fillStyle = '#000000';
+      if (!bh.opaque) ctx.globalAlpha = 0.9;
+      ctx.arc(bh.x,bh.y,bh.r,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+      if (bh.polarity === 'repel') {
+        for (let s=0; s<4; s++){
+          const ang = (now*0.006 + s*1.57) % (Math.PI*2);
+          const sx = Math.cos(ang)*(bh.r + 6 + Math.sin(now*0.005 + s)*12);
+          const sy = Math.sin(ang)*(bh.r + 6 + Math.cos(now*0.005 + s)*12);
+          ctx.beginPath(); ctx.strokeStyle = `rgba(255,255,255,0.07)`; ctx.lineWidth = 1; ctx.moveTo(bh.x, bh.y); ctx.lineTo(bh.x + sx, bh.y + sy); ctx.stroke();
+        }
+      } else {
+        for (let s=0; s<4; s++){
+          const ang = (now*0.006 + s*1.2 + 0.7) % (Math.PI*2);
+          const sx = Math.cos(ang)*(bh.r*2 + Math.sin(now*0.004 + s)*8);
+          const sy = Math.sin(ang)*(bh.r*2 + Math.cos(now*0.004 + s)*8);
+          ctx.beginPath(); ctx.strokeStyle = `rgba(0,0,0,0.45)`; ctx.lineWidth = 1; ctx.moveTo(bh.x + sx, bh.y + sy); ctx.lineTo(bh.x, bh.y); ctx.stroke();
+        }
+      }
+      ctx.beginPath(); ctx.strokeStyle = `rgba(${STATE.COLOR.join(',')},0.9)`; ctx.lineWidth = 1.2; ctx.arc(bh.x,bh.y,bh.r+3,0,Math.PI*2); ctx.stroke();
+    }
+
+    ctx.beginPath(); ctx.strokeStyle = `rgba(${STATE.COLOR.join(',')},0.22)`; ctx.lineWidth = 1.4; ctx.arc(mouse.x, mouse.y, Number(elMouseRadius.value)||64, 0, Math.PI*2); ctx.stroke();
+
+    frames++;
+    if (now - lastFPS >= 500) {
+      const fps = Math.round((frames / (now - lastFPS)) * 1000);
+      frames = 0; lastFPS = now; fpsEl.textContent = fps;
+      document.getElementById('hud').classList.toggle('low', fps < 28);
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function updateHUD(){ hudCount.textContent = particles.length; hudBH.textContent = blackholes.length; hudFields.textContent = fields.length; }
+  setInterval(updateHUD, 400);
+
+  function applyFieldsToAll(){ for (const p of particles) applyFields(p); }
+
+  elCount.addEventListener('input', ()=>{ const v=Number(elCount.value); if(Number.isFinite(v) && v>=0){ STATE.COUNT = Math.floor(v); initParticles(STATE.COUNT); }}); 
+  elRmin.addEventListener('input', ()=> STATE.RMIN = Number(elRmin.value || STATE.RMIN));
+  elRmax.addEventListener('input', ()=> STATE.RMAX = Number(elRmax.value || STATE.RMAX));
+
+  bhMode.addEventListener('change', ()=> { pendingWormEntrance = null; });
+  bhPolarity.addEventListener('change', ()=> {  });
+
+  fieldMode.addEventListener('change', ()=> {  });
+
+  function collectAllState() {
+    return {
+      meta: {
+        version: 1,
+        exportedAt: new Date().toISOString()
+      },
+      engine: {
+        uniqueId,
+        width: W,
+        height: H
+      },
+      particles: particles.map(p => ({
+        id: p.id, x: p.x, y: p.y, vx: p.vx, vy: p.vy, r: p.r, repelled: !!p.repelled
+      })),
+      blackholes: blackholes.map(b => ({
+        id: b.id, x: b.x, y: b.y, r: b.r, strength: b.strength, polarity: b.polarity,
+        destroy: !!b.destroy, opaque: !!b.opaque, vx: b.vx||0, vy: b.vy||0, mass: b.mass||Math.PI*b.r*b.r, _emit: (b._emit||[]).slice()
+      })),
+      wormPairs: wormPairs.map(w => ({ in: w.in, out: w.out })),
+      fields: fields.map(f => ({ id: f.id, type: f.type, x: f.x, y: f.y, radius: f.radius, strength: f.strength, dir: f.dir })),
+      ui: {
+        particleCount: Number(elCount.value) || 0,
+        particleRadiusMin: Number(elRmin.value) || 0,
+        particleRadiusMax: Number(elRmax.value) || 0,
+        colorSelect: colorSelect.value,
+        colorCustom: colorCustom.value || '',
+        dotColor: dotColor.value || '',
+        lineColor: lineColor.value || '',
+        mouseAction: MOUSE_ACTION,
+        mouseHover: elMouseHover.checked,
+        mouseEqual: elMouseEqual.checked,
+        mouseRadius: Number(elMouseRadius.value) || 0,
+        mouseStrength: Number(elMouseStrength.value) || 0,
+        maxInteract: Number(elMaxInteract.value) || 0,
+        interactionStrength: Number(elInteraction.value) || 0,
+        equilDist: Number(elEquilDist.value) || 0,
+        equilStrength: Number(elEquilStr.value) || 0,
+        maxSpeed: Number(sel('max-speed-input').value) || 0,
+        momentum: Number(sel('momentum-input').value) || 0,
+        friction: Number(sel('friction-input').value) || 0,
+        jitter: Number(sel('jitter-input').value) || 0,
+        gravityEnabled: sel('gravity-toggle').checked,
+        gravityAccel: Number(sel('gravity-accel').value) || 0,
+        gravityMaxFall: Number(sel('gravity-maxfall').value) || 0,
+        gravityDir: Number(sel('gravity-dir').value) || 0,
+        maxConn: Number(elMaxConn.value) || 0,
+        lineThickness: Number(elLineTh.value) || 0,
+        lineOpacity: Number(elLineOp.value) || 0,
+        triangles: elTriangles.checked,
+        fillColor: sel('fill-color').value || '',
+        fillAlpha: Number(sel('fill-alpha').value) || 0,
+        triangleMinArea: Number(sel('triangle-min-area').value) || 0,
+        bhMode: bhMode.value,
+        bhNewSize: Number(bhSize.value) || 0,
+        bhNewStrength: Number(bhStrength.value) || 0,
+        bhPolaritySelect: bhPolarity.value,
+        bhDestroy: bhDestroy.checked,
+        bhOpaque: bhOpaque.checked,
+        fieldMode: fieldMode.value,
+        fieldRadius: Number(fieldRadius.value) || 0,
+        fieldStrength: Number(fieldStrength.value) || 0,
+        fieldDir: Number(fieldDirInput.value) || 0,
+        debug: {
+          showArrows: dbgShowArrows.checked,
+          heatmap: dbgHeatmap.checked,
+          trails: dbgTrails.checked,
+          arrowScale: Number(dbgArrowScale.value) || 0,
+          heatMax: Number(dbgHeatMax.value) || 0,
+          glow: Number(dbgGlow.value) || 0,
+          heatColdHex: (dbgHeatCold.value || '').trim(),
+          heatHotHex: (dbgHeatHot.value || '').trim()
+        },
+        openPanel: panel.classList.contains('open'),
+        activeTab: tabs.find(t => t.classList.contains('active'))?.getAttribute('data-for') || 'general',
+        pendingWormEntrance
+      }
+    };
+  }
+
+  exportBtn.addEventListener('click', ()=> {
+    try {
+      const cfg = collectAllState();
+      const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g,'-');
+      a.href = url;
+      a.download = `particle-config-${ts}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed', err);
+      alert('Failed to export configuration: ' + (err && err.message));
+    }
+  });
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'application/json,.json';
+  fileInput.style.display = 'none';
+  document.body.appendChild(fileInput);
+
+  function safeNum(v, fallback=0) { const n = Number(v); return Number.isFinite(n) ? n : fallback; }
+
+  function importConfigFromObject(cfg) {
+    if (!cfg || typeof cfg !== 'object') throw new Error('Invalid config object');
+
+    if (cfg.engine && typeof cfg.engine.uniqueId === 'number') {
+      uniqueId = Math.max(2, Math.floor(cfg.engine.uniqueId));
+    }
+
+    if (Array.isArray(cfg.particles)) {
+      particles.length = 0;
+      for (const p of cfg.particles) {
+        const id = Number(p.id) || makeId();
+        const x = safeNum(p.x, rand(0,W));
+        const y = safeNum(p.y, rand(0,H));
+        const vx = safeNum(p.vx, (Math.random()-0.5)*0.6);
+        const vy = safeNum(p.vy, (Math.random()-0.5)*0.6);
+        const r = Math.max(0.5, safeNum(p.r, STATE.RMIN));
+        const repelled = !!p.repelled;
+        particles.push({ id, x, y, vx, vy, r, repelled });
+      }
+      hudCount.textContent = particles.length;
+    } else if (typeof cfg.particles === 'number') {
+      STATE.COUNT = Math.max(0, Math.floor(cfg.particles));
+      elCount.value = STATE.COUNT;
+      initParticles(STATE.COUNT);
+    }
+
+    blackholes.length = 0;
+    if (Array.isArray(cfg.blackholes)) {
+      for (const b of cfg.blackholes) {
+        const id = Number(b.id) || makeId();
+        const x = safeNum(b.x, W/2);
+        const y = safeNum(b.y, H/2);
+        const r = Math.max(2, safeNum(b.r, 28));
+        const strength = safeNum(b.strength, 1.6);
+        const polarity = (b.polarity === 'repel' || b.polarity === 'attract' || b.polarity === 'wormhole') ? b.polarity : 'attract';
+        const vx = safeNum(b.vx, 0), vy = safeNum(b.vy, 0);
+        const destroy = !!b.destroy;
+        const opaque = (b.opaque === undefined) ? true : !!b.opaque;
+        const mass = safeNum(b.mass, Math.PI*r*r);
+        const _emit = Array.isArray(b._emit) ? b._emit.slice() : [];
+        uniqueId = Math.max(uniqueId, id + 1);
+        blackholes.push({ id, x, y, r, strength, polarity, mass, vx, vy, destroy, opaque, beingDragged:false, _emit });
+      }
+    }
+
+    wormPairs.length = 0;
+    if (Array.isArray(cfg.wormPairs)) {
+      for (const w of cfg.wormPairs) {
+        if (w && (typeof w.in !== 'undefined') && (typeof w.out !== 'undefined')) wormPairs.push({ in: w.in, out: w.out });
+      }
+    }
+
+    fields.length = 0;
+    if (Array.isArray(cfg.fields)) {
+      for (const f of cfg.fields) {
+        const id = Number(f.id) || makeId();
+        const type = (f.type === 'vortex' || f.type === 'radial' || f.type === 'wind') ? f.type : 'radial';
+        const x = safeNum(f.x, W/2);
+        const y = safeNum(f.y, H/2);
+        const radius = Math.max(1, safeNum(f.radius, 120));
+        const strength = safeNum(f.strength, 0.8);
+        const dir = safeNum(f.dir, 0);
+        uniqueId = Math.max(uniqueId, id + 1);
+        fields.push({ id, type, x, y, radius, strength, dir });
+      }
+    }
+
+    if (cfg.ui && typeof cfg.ui === 'object') {
+      const ui = cfg.ui;
+
+      if (typeof ui.particleCount === 'number') { elCount.value = ui.particleCount; STATE.COUNT = ui.particleCount; }
+      if (typeof ui.particleRadiusMin === 'number') elRmin.value = ui.particleRadiusMin;
+      if (typeof ui.particleRadiusMax === 'number') elRmax.value = ui.particleRadiusMax;
+
+      if (typeof ui.colorSelect === 'string') {
+        colorSelect.value = ui.colorSelect;
+        if (ui.colorSelect === 'custom') { colorCustom.style.display = 'block'; }
+      }
+      if (typeof ui.colorCustom === 'string') { colorCustom.value = ui.colorCustom; }
+      if (typeof ui.dotColor === 'string') dotColor.value = ui.dotColor;
+      if (typeof ui.lineColor === 'string') lineColor.value = ui.lineColor;
+
+      if (typeof ui.mouseAction === 'string') { selectMouseAction(ui.mouseAction); }
+      if (typeof ui.mouseHover === 'boolean') elMouseHover.checked = ui.mouseHover;
+      if (typeof ui.mouseEqual === 'boolean') elMouseEqual.checked = ui.mouseEqual;
+      if (typeof ui.mouseRadius === 'number') elMouseRadius.value = ui.mouseRadius;
+      if (typeof ui.mouseStrength === 'number') elMouseStrength.value = ui.mouseStrength;
+
+      if (typeof ui.maxInteract === 'number') elMaxInteract.value = ui.maxInteract;
+      if (typeof ui.interactionStrength === 'number') elInteraction.value = ui.interactionStrength;
+      if (typeof ui.equilDist === 'number') elEquilDist.value = ui.equilDist;
+      if (typeof ui.equilStrength === 'number') elEquilStr.value = ui.equilStrength;
+      if (typeof ui.maxSpeed === 'number') sel('max-speed-input').value = ui.maxSpeed;
+      if (typeof ui.momentum === 'number') sel('momentum-input').value = ui.momentum;
+      if (typeof ui.friction === 'number') sel('friction-input').value = ui.friction;
+      if (typeof ui.jitter === 'number') sel('jitter-input').value = ui.jitter;
+      if (typeof ui.gravityEnabled === 'boolean') sel('gravity-toggle').checked = ui.gravityEnabled;
+      if (typeof ui.gravityAccel === 'number') sel('gravity-accel').value = ui.gravityAccel;
+      if (typeof ui.gravityMaxFall === 'number') sel('gravity-maxfall').value = ui.gravityMaxFall;
+      if (typeof ui.gravityDir === 'number') sel('gravity-dir').value = ui.gravityDir;
+
+      if (typeof ui.maxConn === 'number') elMaxConn.value = ui.maxConn;
+      if (typeof ui.lineThickness === 'number') elLineTh.value = ui.lineThickness;
+      if (typeof ui.lineOpacity === 'number') elLineOp.value = ui.lineOpacity;
+      if (typeof ui.triangles === 'boolean') elTriangles.checked = ui.triangles;
+      if (typeof ui.fillColor === 'string') sel('fill-color').value = ui.fillColor;
+      if (typeof ui.fillAlpha === 'number') sel('fill-alpha').value = ui.fillAlpha;
+      if (typeof ui.triangleMinArea === 'number') sel('triangle-min-area').value = ui.triangleMinArea;
+
+      if (typeof ui.bhMode === 'string') bhMode.value = ui.bhMode;
+      if (typeof ui.bhNewSize === 'number') bhSize.value = ui.bhNewSize;
+      if (typeof ui.bhNewStrength === 'number') bhStrength.value = ui.bhNewStrength;
+      if (typeof ui.bhPolaritySelect === 'string') bhPolarity.value = ui.bhPolaritySelect;
+      if (typeof ui.bhDestroy === 'boolean') bhDestroy.checked = ui.bhDestroy;
+      if (typeof ui.bhOpaque === 'boolean') bhOpaque.checked = ui.bhOpaque;
+
+      if (typeof ui.fieldMode === 'string') fieldMode.value = ui.fieldMode;
+      if (typeof ui.fieldRadius === 'number') fieldRadius.value = ui.fieldRadius;
+      if (typeof ui.fieldStrength === 'number') fieldStrength.value = ui.fieldStrength;
+      if (typeof ui.fieldDir === 'number') fieldDirInput.value = ui.fieldDir;
+
+      if (ui.debug && typeof ui.debug === 'object') {
+        if (typeof ui.debug.showArrows === 'boolean') dbgShowArrows.checked = ui.debug.showArrows;
+        if (typeof ui.debug.heatmap === 'boolean') dbgHeatmap.checked = ui.debug.heatmap;
+        if (typeof ui.debug.trails === 'boolean') dbgTrails.checked = ui.debug.trails;
+        if (typeof ui.debug.arrowScale === 'number') dbgArrowScale.value = ui.debug.arrowScale;
+        if (typeof ui.debug.heatMax === 'number') dbgHeatMax.value = ui.debug.heatMax;
+        if (typeof ui.debug.glow === 'number') dbgGlow.value = ui.debug.glow;
+        if (typeof ui.debug.heatColdHex === 'string') dbgHeatCold.value = ui.debug.heatColdHex || dbgHeatCold.value;
+        if (typeof ui.debug.heatHotHex === 'string') dbgHeatHot.value = ui.debug.heatHotHex || dbgHeatHot.value;
+      }
+
+      if (typeof ui.openPanel === 'boolean') {
+        panel.classList.toggle('open', ui.openPanel);
+        toggleBtn.textContent = ui.openPanel ? 'Settings ▴' : 'Settings ▾';
+      }
+      if (typeof ui.activeTab === 'string') {
+        const t = tabs.find(x => x.getAttribute('data-for') === ui.activeTab);
+        if (t) t.click();
+      }
+
+      if (typeof ui.pendingWormEntrance !== 'undefined') pendingWormEntrance = ui.pendingWormEntrance;
+    }
+
+    if (colorSelect.value !== 'custom') {
+      STATE.COLOR = colorSelect.value.split(',').map(n=>Number(n));
+      document.documentElement.style.setProperty('--accent', STATE.COLOR.join(','));
+    } else if (colorCustom.value) {
+      const v = colorCustom.value.trim(), hex = v.startsWith('#') ? v.slice(1) : v;
+      if (/^[0-9A-Fa-f]{6}$/.test(hex)) {
+        STATE.COLOR = [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
+        document.documentElement.style.setProperty('--accent', STATE.COLOR.join(','));
+      }
+    }
+
+    const maxParticleId = particles.reduce((m,p)=>Math.max(m,p.id||0), 0);
+    const maxBHId = blackholes.reduce((m,b)=>Math.max(m,b.id||0), 0);
+    const maxFieldId = fields.reduce((m,f)=>Math.max(m,f.id||0), 0);
+    uniqueId = Math.max(uniqueId, maxParticleId+1, maxBHId+1, maxFieldId+1);
+
+    updateHUD();
+  }
+
+  fileInput.addEventListener('change', (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        importConfigFromObject(parsed);
+      } catch (err) {
+        console.error('Import failed', err);
+        alert('Failed to import JSON: ' + (err && err.message));
+      }
+    };
+    reader.onerror = (err) => {
+      console.error('File read error', err);
+      alert('Failed to read file');
+    };
+    reader.readAsText(f);
+    fileInput.value = '';
+  });
+
+  importBtn.addEventListener('click', () => fileInput.click());
+
+  window.addEventListener('keydown', e => { if (e.key === 'c' || e.key === 'C') toggleBtn.click(); });
+
+  window.PP = { particles, blackholes, wormPairs, fields, addBH, addField, removeBHById, clearFields, importConfigFromObject, collectAllState };
+
+})();
+</script>
+</body>
+</html>
